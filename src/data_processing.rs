@@ -240,13 +240,12 @@ pub fn generate_world(
     let progress_increment_grnd: f64 = 20.0 / total_iterations_grnd;
 
     //let water_root: i32 = hazard.min_level(xzbbox);
-    let water_root: i32 = 62;
     //let water_root: i32 = 70;
 
     for x in xzbbox.min_x()..=xzbbox.max_x() {
         for z in xzbbox.min_z()..=xzbbox.max_z() {
             // Add default dirt and grass layer if there isn't a stone layer already
-            let y: i32 = hazard.level(XZPoint::new(x, z)) + water_root;
+            let y: i32 = hazard.level(XZPoint::new(x, z));
             //if !editor.check_for_block(x, 0, z, Some(&[STONE])) {
             editor.set_block(WATER, x, y, z, None, None);
             for h in 0..y {

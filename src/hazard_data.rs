@@ -227,7 +227,7 @@ pub fn fetch_elevation_data(
     ); */
 
     // Continue with the existing blur and conversion to Minecraft heights...
-    let blurred_heights: Vec<Vec<f64>> = apply_gaussian_blur(&height_grid, sigma);
+    let blurred_heights: Vec<Vec<f64>> = height_grid; //apply_gaussian_blur(&height_grid, sigma);
 
     let mut mc_heights: Vec<Vec<i32>> = Vec::with_capacity(blurred_heights.len());
 
@@ -286,16 +286,7 @@ pub fn fetch_elevation_data(
 
     // Convert to scaled Minecraft Y coordinates
     for row in blurred_heights {
-        let mc_row: Vec<i32> = row
-            .iter()
-            .map(|&h| {
-                // Scale the height differences
-                let relative_height: f64 = (h - min_height) / height_range;
-                let scaled_height: f64 = relative_height * scaled_range;
-                // With terrain enabled, ground_level is used as the MIN_Y for terrain
-                ((ground_level as f64 + scaled_height).round() as i32).clamp(ground_level, MAX_Y)
-            })
-            .collect();
+        let mc_row: Vec<i32> = row.iter().map(|&h| h as i32).collect();
         mc_heights.push(mc_row);
     }
 
