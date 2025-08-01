@@ -1,8 +1,9 @@
 use crate::args::Args;
-use crate::block_definitions::{BEDROCK, DIRT, GRASS_BLOCK, STONE};
-use crate::coordinate_system::cartesian::XZBBox;
+use crate::block_definitions::{AIR, BEDROCK, DIRT, GRASS_BLOCK, STONE, WATER};
+use crate::coordinate_system::cartesian::{XZBBox, XZPoint};
 use crate::element_processing::*;
 use crate::ground::Ground;
+use crate::hazard::Hazard;
 use crate::osm_parser::ProcessedElement;
 use crate::progress::emit_gui_progress_update;
 use crate::world_editor::WorldEditor;
@@ -15,6 +16,7 @@ pub fn generate_world(
     elements: Vec<ProcessedElement>,
     xzbbox: XZBBox,
     ground: Ground,
+    hazard: Hazard,
     args: &Args,
 ) -> Result<(), String> {
     let region_dir: String = format!("{}/region", args.path);
@@ -166,7 +168,6 @@ pub fn generate_world(
                 editor.set_block(DIRT, x, -1, z, None, None);
                 editor.set_block(DIRT, x, -2, z, None, None);
             }
-
             // Fill underground with stone
             if args.fillground {
                 // Fill from bedrock+1 to 3 blocks below ground with stone
@@ -213,6 +214,95 @@ pub fn generate_world(
     ground_pb.inc(block_counter % batch_size);
     ground_pb.finish();
 
+    //
+
+    // Generate hazard layer
+    let total_blocks: u64 = xzbbox.bounding_rect().total_blocks();
+    let desired_updates: u64 = 1500;
+    let batch_size: u64 = (total_blocks / desired_updates).max(1);
+
+    let mut block_counter: u64 = 0;
+
+    println!("{} Generating ground...", "[5/6]".bold());
+    emit_gui_progress_update(70.0, "Generating ground...");
+
+    let ground_pb: ProgressBar = ProgressBar::new(total_blocks);
+    ground_pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:45}] {pos}/{len} blocks ({eta})")
+            .unwrap()
+            .progress_chars("█▓░"),
+    );
+
+    let mut gui_progress_grnd: f64 = 70.0;
+    let mut last_emitted_progress: f64 = gui_progress_grnd;
+    let total_iterations_grnd: f64 = total_blocks as f64;
+    let progress_increment_grnd: f64 = 20.0 / total_iterations_grnd;
+
+    //let water_root: i32 = hazard.min_level(xzbbox);
+    let water_root: i32 = 62;
+    //let water_root: i32 = 70;
+
+    for x in xzbbox.min_x()..=xzbbox.max_x() {
+        for z in xzbbox.min_z()..=xzbbox.max_z() {
+            // Add default dirt and grass layer if there isn't a stone layer already
+            let y: i32 = hazard.level(XZPoint::new(x, z)) + water_root;
+            //if !editor.check_for_block(x, 0, z, Some(&[STONE])) {
+            editor.set_block(WATER, x, y, z, None, None);
+            for h in 0..y {
+                //if editor.check_for_block(x, y, z, Some(&[AIR])) {
+                editor.set_block(WATER, x, h, z, None, None);
+                //}
+            }
+            //editor.set_block(DIRT, x, -1, z, None, None);
+            //editor.set_block(DIRT, x, -2, z, None, None);
+            //}
+            //println!("{}", y);
+            // Fill underground with stone
+            if args.fillground {
+                // Fill from bedrock+1 to 3 blocks below ground with stone
+                editor.fill_blocks_absolute(
+                    WATER,
+                    x,
+                    MIN_Y + 1,
+                    z,
+                    x,
+                    hazard.level(XZPoint::new(x, z)),
+                    z,
+                    None,
+                    None,
+                );
+            }
+            // Generate a bedrock level at MIN_Y
+            editor.set_block_absolute(BEDROCK, x, MIN_Y, z, None, Some(&[BEDROCK]));
+
+            block_counter += 1;
+            if block_counter % batch_size == 0 {
+                ground_pb.inc(batch_size);
+            }
+
+            gui_progress_grnd += progress_increment_grnd;
+            if (gui_progress_grnd - last_emitted_progress).abs() > 0.25 {
+                emit_gui_progress_update(gui_progress_grnd, "");
+                last_emitted_progress = gui_progress_grnd;
+            }
+        }
+    }
+
+    // Set sign for player orientation
+    /*editor.set_sign(
+        "↑".to_string(),
+        "Generated World".to_string(),
+        "This direction".to_string(),
+        "".to_string(),
+        9,
+        -61,
+        9,
+        6,
+    );*/
+
+    ground_pb.inc(block_counter % batch_size);
+    ground_pb.finish();
     // Save world
     editor.save();
 

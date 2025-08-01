@@ -1,6 +1,7 @@
 use super::operator::operator_vec_from_json;
 use crate::coordinate_system::cartesian::XZBBox;
 use crate::ground::Ground;
+use crate::hazard::Hazard;
 use crate::osm_parser::ProcessedElement;
 use crate::progress::emit_gui_progress_update;
 use colored::Colorize;
@@ -10,6 +11,7 @@ pub fn transform_map(
     elements: &mut Vec<ProcessedElement>,
     xzbbox: &mut XZBBox,
     ground: &mut Ground,
+    hazard: &mut Hazard,
 ) {
     println!("{} Transforming map...", "[3/6]".bold());
     emit_gui_progress_update(20.0, "Transforming map...");
@@ -41,7 +43,7 @@ pub fn transform_map(
 
                 iop += 1;
 
-                op.operate(elements, xzbbox, ground);
+                op.operate(elements, xzbbox, ground, hazard);
             }
 
             emit_gui_progress_update(25.0, "");
