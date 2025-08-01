@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OSM + ハザードマップ（全レイヤーON/OFF対応）</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-overpass-layer/dist/OverPassLayer.bundle.js"></script>
+    <style>
+      /* ページの余白をなくし、地図を全画面表示にします */
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+      // 地図初期化
+      const map = L.map("map").setView([35.6895, 139.6917], 14);
+
+      // --- 1. 各レイヤーを変数に格納 ---
+
+      // OpenStreetMap レイヤー
+      const osmLayer = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          maxZoom: 19,
+          attribution:
+            '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }
+      );
+
+      // GSI ハザードマップ レイヤー
+      const hazardLayer = L.tileLayer(
+        "https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin_data/{z}/{x}/{y}.png",
+        {
+          opacity: 0.7,
+          maxZoom: 17,
+          attribution:
+            '<a href="https://disaportal.gsi.go.jp/" target="_blank">ハザードマップポータルサイト</a>',
+        }
+      );
+
+      // Overpass 建物データ レイヤー
+      const buildingLayer = new L.OverPassLayer({
+        query: `
+          [out:json];
+          (way["building"](around:1000,35.6895,139.6917););
+          out body;
+          >;
+          out skel qt;
+        `,
+        minZoom: 13,
+      });
+
+      // --- 2. レイヤーをグループ化 ---
+
+      // ベースマップのグループは空にする
+      const baseLayers = null;
+
+      // すべてのレイヤーをオーバーレイとしてグループ化
+      const overlayLayers = {
+        OpenStreetMap: osmLayer, // OSMをこちらに移動
+        "建物 (Overpass)": buildingLayer,
+        "洪水浸水想定区域 (国土地理院)": hazardLayer,
+      };
+
+      // --- 3. デフォルトで表示するレイヤーとコントロールを地図に追加 ---
+
+      // デフォルトで表示するレイヤー
+      osmLayer.addTo(map);
+      hazardLayer.addTo(map);
+      buildingLayer.addTo(map);
+
+      // レイヤーコントロールを地図に追加
+      // 第1引数(ベースレイヤー)に null を渡す
+      L.control.layers(baseLayers, overlayLayers).addTo(map);
+    </script>
+  </body>
+</html>
