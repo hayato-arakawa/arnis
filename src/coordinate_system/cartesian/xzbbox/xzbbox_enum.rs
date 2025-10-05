@@ -83,6 +83,18 @@ impl XZBBox {
     pub fn max_z(&self) -> i32 {
         self.bounding_rect().max().z
     }
+
+    /// Convert XZBBox into an iterator of XZPoint
+    pub fn into_iter(self) -> impl Iterator<Item = XZPoint> {
+        let min_x = self.min_x();
+        let max_x = self.max_x();
+        let min_z = self.min_z();
+        let max_z = self.max_z();
+        
+        (min_x..=max_x).flat_map(move |x| {
+            (min_z..=max_z).map(move |z| XZPoint::new(x, z))
+        })
+    }
 }
 
 impl fmt::Display for XZBBox {
@@ -198,5 +210,37 @@ mod test {
 
         assert!(XZBBox::rect_from_xz_lengths(i32::MAX as f64 + 10.0, -0.5).is_err());
         assert!(XZBBox::rect_from_xz_lengths(0.2, i32::MAX as f64 + 10.0).is_err());
+    }
+
+    #[test]
+    fn test_into_iter() {
+        // Test 2x2 bbox
+        let bbox = XZBBox::rect_from_xz_lengths(1.0, 1.0).unwrap();
+        let points: Vec<XZPoint> = bbox.into_iter().collect();
+        
+        assert_eq!(points.len(), 4);
+        assert!(points.contains(&XZPoint::new(0, 0)));
+        assert!(points.contains(&XZPoint::new(0, 1)));
+        assert!(points.contains(&XZPoint::new(1, 0)));
+        assert!(points.contains(&XZPoint::new(1, 1)));
+
+        // Test 1x1 bbox
+        let bbox = XZBBox::rect_from_xz_lengths(0.0, 0.0).unwrap();
+        let points: Vec<XZPoint> = bbox.into_iter().collect();
+        
+        assert_eq!(points.len(), 1);
+        assert_eq!(points[0], XZPoint::new(0, 0));
+
+        // Test larger bbox
+        let bbox = XZBBox::rect_from_xz_lengths(2.0, 1.0).unwrap();
+        let points: Vec<XZPoint> = bbox.into_iter().collect();
+        
+        assert_eq!(points.len(), 6); // 3x2 = 6 points
+        assert!(points.contains(&XZPoint::new(0, 0)));
+        assert!(points.contains(&XZPoint::new(0, 1)));
+        assert!(points.contains(&XZPoint::new(1, 0)));
+        assert!(points.contains(&XZPoint::new(1, 1)));
+        assert!(points.contains(&XZPoint::new(2, 0)));
+        assert!(points.contains(&XZPoint::new(2, 1)));
     }
 }

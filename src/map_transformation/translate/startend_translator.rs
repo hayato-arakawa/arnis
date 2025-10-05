@@ -2,6 +2,7 @@ use super::translator::translate_by_vector;
 use super::Operator;
 use crate::coordinate_system::cartesian::{XZBBox, XZPoint};
 use crate::ground::Ground;
+use crate::hazard::Hazard;
 use crate::osm_parser::ProcessedElement;
 use serde::Deserialize;
 
@@ -13,7 +14,13 @@ pub struct StartEndTranslator {
 }
 
 impl Operator for StartEndTranslator {
-    fn operate(&self, elements: &mut Vec<ProcessedElement>, xzbbox: &mut XZBBox, _: &mut Ground) {
+    fn operate(
+        &self,
+        elements: &mut Vec<ProcessedElement>,
+        xzbbox: &mut XZBBox,
+        _: &mut Ground,
+        _: &mut Hazard,
+    ) {
         translate_by_vector(self.end - self.start, elements, xzbbox);
     }
 

@@ -1,6 +1,7 @@
 use super::translate::translator_from_json;
 use crate::coordinate_system::cartesian::XZBBox;
 use crate::ground::Ground;
+use crate::hazard::Hazard;
 use crate::osm_parser::ProcessedElement;
 
 /// An Operator does transformation on the map, modifying Vec<ProcessedElement> and XZBBox
@@ -11,6 +12,7 @@ pub trait Operator {
         elements: &mut Vec<ProcessedElement>,
         xzbbox: &mut XZBBox,
         ground: &mut Ground,
+        hazard: &mut Hazard,
     );
 
     #[allow(dead_code)]

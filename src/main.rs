@@ -9,6 +9,8 @@ mod data_processing;
 mod element_processing;
 mod floodfill;
 mod ground;
+mod hazard;
+mod hazard_data;
 mod map_transformation;
 mod osm_parser;
 #[cfg(feature = "gui")]
@@ -87,6 +89,7 @@ fn run_cli() {
     .expect("Failed to fetch data");
 
     let mut ground = ground::generate_ground_data(&args);
+    let mut hazard = hazard::generate_ground_data(&args);
 
     // Parse raw data
     let (mut parsed_elements, mut xzbbox) =
@@ -112,10 +115,10 @@ fn run_cli() {
     }
 
     // Transform map (parsed_elements). Operations are defined in a json file
-    map_transformation::transform_map(&mut parsed_elements, &mut xzbbox, &mut ground);
+    map_transformation::transform_map(&mut parsed_elements, &mut xzbbox, &mut ground, &mut hazard);
 
     // Generate world
-    let _ = data_processing::generate_world(parsed_elements, xzbbox, ground, &args);
+    let _ = data_processing::generate_world(parsed_elements, xzbbox, ground, hazard, &args);
 }
 
 fn main() {

@@ -8,7 +8,7 @@ const MAX_Y: i32 = 319;
 const BASE_HEIGHT_SCALE: f64 = 0.6;
 /// AWS S3 Terrarium tiles endpoint (no API key required)
 const AWS_TERRARIUM_URL: &str =
-    "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+    "https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin_data/{z}/{x}/{y}.png";
 /// Terrarium format offset for height decoding
 const TERRARIUM_OFFSET: f64 = 32768.0;
 /// Minimum zoom level for terrain tiles
@@ -77,7 +77,7 @@ pub fn fetch_elevation_data(
     // Fetch and process each tile
     for (tile_x, tile_y) in &tiles {
         // Check if tile is already cached
-        let tile_path = tile_cache_dir.join(format!("z{zoom}_x{tile_x}_y{tile_y}.png"));
+        let tile_path = tile_cache_dir.join(format!("z{zoom}_x{tile_x}_y{tile_y}.haz.png"));
 
         let rgb_img: image::ImageBuffer<Rgb<u8>, Vec<u8>> = if tile_path.exists() {
             println!(
@@ -94,14 +94,32 @@ pub fn fetch_elevation_data(
                 .replace("{x}", &tile_x.to_string())
                 .replace("{y}", &tile_y.to_string());
 
-            let response: reqwest::blocking::Response = client.get(&url).send()?;
-            response.error_for_status_ref()?;
-            let bytes = response.bytes()?;
-            std::fs::write(&tile_path, &bytes)?;
-            let img: image::DynamicImage = image::load_from_memory(&bytes)?;
-            img.to_rgb8()
+            // 画像取得と処理を試みる
+            let result = (|| -> Result<image::RgbImage, Box<dyn std::error::Error>> {
+                let response: reqwest::blocking::Response = client.get(&url).send()?;
+                response.error_for_status_ref()?; // HTTPステータスコードがエラーの場合にエラーを返す
+                let bytes = response.bytes()?;
+                std::fs::write(&tile_path, &bytes)?; // 取得した画像をファイルに保存
+                let img: image::DynamicImage = image::load_from_memory(&bytes)?; // メモリから画像をロード
+                Ok(img.to_rgb8()) // RGB8形式に変換して返す
+            })(); // 即時実行関数でResultを返す
+
+            // 結果に基づいて処理を分岐
+            match result {
+                Ok(img_rgb8) => {
+                    // 成功した場合、取得した画像を返す
+                    img_rgb8
+                }
+                Err(e) => {
+                    // エラーが発生した場合、エラーメッセージを出力し、白い画像を生成して返す
+                    eprintln!("タイル x={tile_x},y={tile_y},z={zoom} のフェッチまたは処理中にエラーが発生しました: {}", e);
+                    // 256x256の真っ白な画像を生成
+                    image::RgbImage::from_pixel(256, 256, image::Rgb([255, 255, 255]))
+                }
+            }
         };
 
+        // Only process pixels that fall within the requested bbox
         for (y, row) in rgb_img.rows().enumerate() {
             for (x, pixel) in row.enumerate() {
                 // Convert tile pixel coordinates back to geographic coordinates
@@ -135,9 +153,26 @@ pub fn fetch_elevation_data(
                 }
 
                 // Decode Terrarium format: (R * 256 + G + B/256) - 32768
-                let height: f64 =
-                    (pixel[0] as f64 * 256.0 + pixel[1] as f64 + pixel[2] as f64 / 256.0)
-                        - TERRARIUM_OFFSET;
+                // ピクセルの色に基づいて標高を決定します。
+                // image::Rgb<u8> はタプル構造体 `pub struct Rgb<T>(pub [T; 3]);` なので、
+                // `.0` を使って内部の配列 [u8; 3] にアクセスします。
+                let height: f64 = match pixel.0 {
+                    // 例1: 特定の色（例：純粋な黒 [0, 0, 0]）を「データなし」として扱う
+                    [255, 252, 187] => 1.0,
+                    [249, 242, 177] => 1.0,
+                    [247, 245, 169] => 1.0,  //ok
+                    [255, 216, 192] => 3.0,  //ok
+                    [255, 183, 183] => 5.0,  //ok
+                    [255, 145, 145] => 10.0, //ok
+                    [243, 133, 198] => 20.0,
+                    [220, 125, 215] => 25.0,
+
+                    // デフォルトのケース: 他のすべての色
+                    [r, g, b] => 0.0,
+                };
+                if pixel.0 != [0, 0, 0] && height == 0.0 {
+                    println!("{:?}", pixel.0);
+                }
 
                 // Track extreme values for debugging
                 if !(-1000.0..=10000.0).contains(&height) {
@@ -197,7 +232,7 @@ pub fn fetch_elevation_data(
     ); */
 
     // Continue with the existing blur and conversion to Minecraft heights...
-    let blurred_heights: Vec<Vec<f64>> = apply_gaussian_blur(&height_grid, sigma);
+    let blurred_heights: Vec<Vec<f64>> = height_grid; //apply_gaussian_blur(&height_grid, sigma);
 
     let mut mc_heights: Vec<Vec<i32>> = Vec::with_capacity(blurred_heights.len());
 
@@ -256,16 +291,7 @@ pub fn fetch_elevation_data(
 
     // Convert to scaled Minecraft Y coordinates
     for row in blurred_heights {
-        let mc_row: Vec<i32> = row
-            .iter()
-            .map(|&h| {
-                // Scale the height differences
-                let relative_height: f64 = (h - min_height) / height_range;
-                let scaled_height: f64 = relative_height * scaled_range;
-                // With terrain enabled, ground_level is used as the MIN_Y for terrain
-                ((ground_level as f64 + scaled_height).round() as i32).clamp(ground_level, MAX_Y)
-            })
-            .collect();
+        let mc_row: Vec<i32> = row.iter().map(|&h| h as i32).collect();
         mc_heights.push(mc_row);
     }
 
