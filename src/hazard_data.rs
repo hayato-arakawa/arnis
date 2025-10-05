@@ -145,8 +145,8 @@ pub fn fetch_elevation_data(
                 let rel_y =
                     1.0 - (pixel_lat - bbox.min().lat()) / (bbox.max().lat() - bbox.min().lat());
 
-                let scaled_x = (rel_x * grid_width as f64).round() as usize;
-                let scaled_y = (rel_y * grid_height as f64).round() as usize;
+                let scaled_x = (rel_x * grid_width as f64).floor() as usize;
+                let scaled_y = (rel_y * grid_height as f64).floor() as usize;
 
                 if scaled_y >= grid_height || scaled_x >= grid_width {
                     continue;
@@ -232,7 +232,7 @@ pub fn fetch_elevation_data(
     ); */
 
     // Continue with the existing blur and conversion to Minecraft heights...
-    let blurred_heights: Vec<Vec<f64>> = height_grid; //apply_gaussian_blur(&height_grid, sigma);
+    let blurred_heights: Vec<Vec<f64>> = apply_gaussian_blur(&height_grid, sigma);
 
     let mut mc_heights: Vec<Vec<i32>> = Vec::with_capacity(blurred_heights.len());
 
