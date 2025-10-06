@@ -374,6 +374,13 @@ fn apply_gaussian_blur(heights: &[Vec<f64>], sigma: f64) -> Vec<Vec<f64>> {
             row[x] = sum / weight_sum;
         }
     }
+    for row in blurred.iter_mut() {
+        for val in row.iter_mut() {
+            if *val >= 0.1 && *val <= 1.0 {
+                *val = 1.0;
+            }
+        }
+    }
 
     blurred
 }
